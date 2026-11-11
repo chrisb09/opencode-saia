@@ -1,0 +1,30 @@
+{
+  "name": "opencode-saia",
+  "version": "0.1.0",
+  "description": "Live SAIA models for OpenCode V1 and V2, with optional passive ai_usage quota reporting",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "test:compat": "npm run build && node test/compatibility.mjs",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@opencode/plugin": "2.2.6",
+    "@opencode-ai/plugin": "1.18.29",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  },
+  "license": "MIT"
+}
