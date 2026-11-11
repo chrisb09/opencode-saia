@@ -34,9 +34,21 @@ appropriate configuration below, then run:
 /models
 ```
 
-SAIA appears in `/connect` before any key is configured. OpenCode stores the key
-in its own credential store; the plugin never writes it to project/plugin
-configuration. Saved API keys take precedence over the `SAIA_API_KEY`
+On V2, SAIA appears in `/connect` before any key is configured. Newer V1
+releases can omit providers that currently expose no models, so `/connect` may
+not list SAIA until a key has been saved. For a first V1 connection, either use
+the CLI, which recognises SAIA without a model catalog:
+
+```sh
+opencode providers login -p saia
+```
+
+or add a temporary placeholder model to `provider.saia.models` (see
+[First V1 connection](#first-v1-connection)). Once a key is saved, discovery
+populates the catalog and SAIA appears in `/connect` and `/models`.
+
+OpenCode stores the key in its own credential store; the plugin never writes it
+to project/plugin configuration. Saved API keys take precedence over the `SAIA_API_KEY`
 environment fallback. Never paste your key into an assistant conversation.
 V2 resolves credentials through OpenCode's connection API. V1 reads the SAIA
 entry from its native `auth.json` (or `OPENCODE_AUTH_CONTENT`) for config-time
@@ -75,7 +87,8 @@ traffic, including titles, compaction, and tool-driven continuations.
 
 ### OpenCode V1 (1.18.29 or newer)
 
-Use the same package's compiled entrypoint with the V1 configuration shape:
+Build the package first (see [Build](#build)), then use the compiled entrypoint
+with the V1 configuration shape:
 
 ```jsonc
 {
@@ -89,9 +102,38 @@ Use the same package's compiled entrypoint with the V1 configuration shape:
 }
 ```
 
-Older V1 releases are not supported. Do not load this and another SAIA provider
-plugin together. This plugin owns the `saia` provider; use its options for the
-endpoint, credentials, and shared model settings.
+`file://` must point at the absolute path to `dist/index.js`. Older V1 releases
+are not supported. Do not load this and another SAIA provider plugin together.
+This plugin owns the `saia` provider; use its options for the endpoint,
+credentials, and shared model settings.
+
+#### First V1 connection
+
+Some V1 releases omit providers that expose no models from the provider list,
+so `/connect` can be empty on the very first run. Connect once with the CLI:
+
+```sh
+opencode providers login -p saia
+```
+
+Alternatively, add a temporary model so the provider survives the filter:
+
+```jsonc
+{
+  "provider": {
+    "saia": {
+      "models": {
+        "connect": { "name": "SAIA (connect to load models)" }
+      }
+    }
+  }
+}
+```
+
+After a key is saved (via `/connect`, the CLI, or `SAIA_API_KEY`), restart
+OpenCode so discovery runs at config load and adds the live catalog. The
+placeholder then remains as a manual model; remove it and restart OpenCode once
+real models appear.
 
 Select a discovered model using `/models`, for example
 `saia/qwen3-coder-next`. Your configured default model is not changed.
@@ -194,6 +236,17 @@ warning; it does not disable SAIA inference.
 Proxy authorization must use `Basic` with canonical base64 credentials. Reusing
 `SAIA_API_KEY` as the upload token is explicitly rejected.
 
+If the ai_usage deployment sits behind a reverse proxy that enforces HTTP Basic
+auth (for example nginx returning `401` with `WWW-Authenticate: Basic`), the
+upload token alone is not enough: set `SAIA_AI_USAGE_PROXY_AUTHORIZATION` to the
+complete `Basic <base64>` header. An HTML `401` from the proxy means the proxy
+credentials are missing or wrong; it does not by itself indicate a bad upload
+token.
+
+On V1, these variables must be present in the environment of the process that
+starts OpenCode. V1 has no `opencode service` command (that is V2); export them
+from the shell or a launcher, and re-source after changing them.
+
 The plugin sends `POST <base-url>/api/saia/observations` with
 `Content-Type: application/json` and `X-AI-Usage-Token`. Only the separately
 configured proxy Basic header is added. Remote URLs must use HTTPS; literal
@@ -258,6 +311,12 @@ npm test
 npm run test:compat
 npm audit --omit=dev
 ```
+
+The suite uses Node's built-in `node --test` runner, so run it with Node 22.
+Tests create temporary fixtures under `/tmp/opencode`; create that directory
+first if it does not exist. Bun 1.3+ can drive the build
+(`bun install --ignore-scripts`, `bun --bun run build`), but keep test runs on
+Node.
 
 Unit tests use fetch mocks. The compatibility script packs and installs the
 production package, runs OpenCode V1 1.18.29 (downloaded with npm exec) and the
